@@ -63,7 +63,7 @@ class ALU
 
             case Operation::SHL: 
                 return SHL(A, B);
-                
+
             case Operation::SHR: 
                 return SHR(A, B);
             
@@ -78,11 +78,15 @@ class ALU
        Result ADD(const std::bitset<8>& A, const std::bitset<8>& B)
        {
             std::bitset<8> result; 
-
-            for(uint8_t i = 0; i<A.size(); i++)
+            bool riporto = false;
+            
+            for(size_t index = 0; index < A.size(); ++index)
             {
-
+               result[index] = A[index] ^ B[index] ^ riporto;              // somma con riporto in ingresso
+               riporto = (A[index] & B[index]) | (B[index] & riporto) | (A[index] & riporto); // nuovo riporto  // Xor Calcolo
             }
+
+            return computeFlags(A[7], B[7], result, riporto);
        }
 
        Result SUB(const std::bitset<8>& A, const std::bitset<8>& B)
@@ -128,5 +132,19 @@ class ALU
        Result SHR(const std::bitset<8>& A, const std::bitset<8>& B = 0)
        {
         
+       }
+
+       Result computeFlags(const bool A, const bool B = 0, const std::bitset<8>& result, const bool& Carry)
+       {
+            Result res;
+
+            res.value = result;
+
+            res.Zero = result.none();                         // zero
+            res.Carry = Carry;                               // <8 bit
+            res.Negarive = result[7];                       // negativo
+            res.Overflow = (A == B) && (result[7] != A);   // Overflow
+
+            return res;
        }
 };
