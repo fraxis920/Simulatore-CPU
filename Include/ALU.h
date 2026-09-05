@@ -1,42 +1,38 @@
-#pragma once
-
 #include <bitset>
 #include <stdexcept>
 #include <string>
-#include <cstdint>
 
 class ALU
 {
-    public:
+public:
+    enum class Operation 
+    {
+        ADD,
+        SUB,
+        INC,
+        DEC,
+        AND,
+        OR,
+        XOR,
+        NOT,
+        SHL,
+        SHR
+    };
 
-        enum class Operation 
+    struct Result 
+    {
+        std::bitset<8> value;
+
+        bool Zero;        
+        bool Carry;      
+        bool Negative; 
+        bool Overflow; 
+    };
+
+    Result execute(Operation operation, const std::bitset<8>& A, const std::bitset<8>& B = 0)
+    {
+        switch (operation)
         {
-            ADD,
-            SUB,
-            INC,
-            DEC,
-            AND,
-            OR,
-            XOR,
-            NOT,
-            SHL,
-            SHR
-        };
-
-        struct Result 
-        {
-            std::bitset<8> value;
-
-            bool Zero;        
-            bool Carry;      
-            bool Negarive; 
-            bool Overflow; 
-        };
- 
-       Result execute(Operation operation, const std::bitset<8>& A, const std::bitset<8>& B = 0)
-       {
-            switch (operation)
-            {
             case Operation::ADD: 
                 return ADD(A, B); 
                 
@@ -69,82 +65,169 @@ class ALU
             
             default:
                 throw std::invalid_argument("Errore: Operation non valida: " + std::to_string(static_cast<int>(operation)));
-                break;
-            }
-       }
-    
-    private:
-       
-       Result ADD(const std::bitset<8>& A, const std::bitset<8>& B)
-       {
-            std::bitset<8> result; 
-            bool riporto = false;
-            
-            for(size_t index = 0; index < A.size(); ++index)
+        }
+    }
+
+    Result ADD(const std::bitset<8>& A, const std::bitset<8>& B)
+    {
+        std::bitset<8> result; 
+        bool riporto = false;
+        
+        for(size_t index = 0; index < A.size(); ++index)
+        {
+            result[index] = A[index] ^ B[index] ^ riporto;              
+            riporto = (A[index] & B[index]) | (B[index] & riporto) | (A[index] & riporto); 
+        }
+
+        bool overflow = (A[7] == B[7]) && (result[7] != A[7]);
+
+        return computeFlags(result, riporto, overflow);
+    }
+
+    Result SUB(const std::bitset<8>& A, const std::bitset<8>& B)
+    {
+        std::bitset<8> B_inv = ~B;
+        std::bitset<8> result; 
+        bool carry = true;
+        
+        for(size_t i = 0; i < 8; ++i)
+        {
+            bool sum = A[i] ^ B_inv[i] ^ carry;
+            carry = (A[i] & B_inv[i]) | (A[i] & carry) | (B_inv[i] & carry);
+            result[i] = sum;
+        }
+
+        bool borrow = !carry;
+        bool overflow = (A[7] != B[7]) && (result[7] != A[7]);
+
+        return computeFlags(result, borrow, overflow);
+    }
+
+    Result INC(const std::bitset<8>& A)
+    {
+        std::bitset<8> result; 
+        bool riporto = true;
+
+        for(size_t index = 0; index < A.size(); ++index)
+        {
+            result[index] = A[index] ^ riporto;              
+            riporto = A[index] & riporto; 
+        }
+
+        bool overflow = (!A[7]) && result[7];
+
+        return computeFlags(result, riporto, overflow);
+    }
+
+    Result DEC(const std::bitset<8>& A)
+    {
+        return SUB(A, std::bitset<8>(1));
+    }
+
+    Result AND(const std::bitset<8>& A, const std::bitset<8>& B)
+    {
+        std::bitset<8> result; 
+
+        for(size_t index = 0; index < A.size(); ++index)
+        {
+            result[index] = A[index] & B[index];               
+        }
+
+        return computeFlags(result, false, false);
+    }
+
+    Result OR(const std::bitset<8>& A, const std::bitset<8>& B)
+    {
+        std::bitset<8> result; 
+
+        for(size_t index = 0; index < A.size(); ++index)
+        {
+            result[index] = A[index] | B[index];               
+        }
+
+        return computeFlags(result, false, false);
+    }
+
+    Result XOR(const std::bitset<8>& A, const std::bitset<8>& B)
+    {
+        std::bitset<8> result; 
+
+        for(size_t index = 0; index < A.size(); ++index)
+        {
+            result[index] = A[index] ^ B[index];               
+        }
+
+        return computeFlags(result, false, false);
+    }
+
+    Result NOT(const std::bitset<8>& A)
+    {
+        std::bitset<8> result; 
+
+        for(size_t index = 0; index < A.size(); ++index)
+        {
+            result[index] = !A[index];               
+        }
+
+        return computeFlags(result, false, false);
+    }
+
+    Result SHL(const std::bitset<8>& A, const std::bitset<8>& B = std::bitset<8>(0))
+    {
+        unsigned long shift_amount = B.to_ulong();
+        std::bitset<8> result = A;
+        bool carry_out = false;
+
+        if (shift_amount > 0) 
+        {
+            if (shift_amount >= 8) 
             {
-               result[index] = A[index] ^ B[index] ^ riporto;              // somma con riporto in ingresso
-               riporto = (A[index] & B[index]) | (B[index] & riporto) | (A[index] & riporto); // nuovo riporto  // Xor Calcolo
+                carry_out = false; 
+                result.reset();
+            } 
+            else 
+            {
+                carry_out = result[8 - shift_amount];
+                result <<= shift_amount;
             }
+        }
 
-            return computeFlags(A[7], B[7], result, riporto);
-       }
+        return computeFlags(result, carry_out, false);
+    }
 
-       Result SUB(const std::bitset<8>& A, const std::bitset<8>& B)
-       {
-        
-       }
+    Result SHR(const std::bitset<8>& A, const std::bitset<8>& B = std::bitset<8>(0))
+    {
+        unsigned long shift_amount = B.to_ulong();
+        std::bitset<8> result = A;
+        bool carry_out = false;
 
-       Result INC(const std::bitset<8>& A)
-       {
-        
-       }
+        if (shift_amount > 0) 
+        {
+            if (shift_amount >= 8) 
+            {
+                carry_out = false;
+                result.reset();
+            } 
+            else 
+            {
+                carry_out = result[shift_amount - 1];
+                result >>= shift_amount;
+            }
+        }
 
-       Result DEC(const std::bitset<8>& A)
-       {
-        
-       }
+        return computeFlags(result, carry_out, false);
+    }
 
-       Result AND(const std::bitset<8>& A, const std::bitset<8>& B)
-       {
-        
-       }
+    Result computeFlags(const std::bitset<8>& result, const bool Carry, const bool Overflow)
+    {
+        Result res;
 
-       Result OR(const std::bitset<8>& A, const std::bitset<8>& B)
-       {
-        
-       }
+        res.value = result;
+        res.Zero = result.none();
+        res.Carry = Carry;
+        res.Negative = result[7];
+        res.Overflow = Overflow;
 
-       Result XOR(const std::bitset<8>& A, const std::bitset<8>& B)
-       {
-        
-       }
-
-       Result NOT(const std::bitset<8>& A)
-       {
-        
-       }
-
-       Result SHL(const std::bitset<8>& A, const std::bitset<8>& B = 0)
-       {
-        
-       }
-
-       Result SHR(const std::bitset<8>& A, const std::bitset<8>& B = 0)
-       {
-        
-       }
-
-       Result computeFlags(const bool A, const bool B = 0, const std::bitset<8>& result, const bool& Carry)
-       {
-            Result res;
-
-            res.value = result;
-
-            res.Zero = result.none();                         // zero
-            res.Carry = Carry;                               // <8 bit
-            res.Negarive = result[7];                       // negativo
-            res.Overflow = (A == B) && (result[7] != A);   // Overflow
-
-            return res;
-       }
+        return res;
+    }
 };

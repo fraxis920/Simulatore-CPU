@@ -5,5 +5,5 @@
 class CPU
 {
     public:
-        Register registers;
+        Register registers;     // nuovo register con valore predefinito 0
 };
