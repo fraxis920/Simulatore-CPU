@@ -1,8 +1,8 @@
-#include "Registers.h"
+#include "..\include\Registers.h"
 
 Register::Register()    // Inizializzazione costruttore responsabile per lo start up della cpu
 {
-    
+
     A.reset();
     B.reset();
     C.reset();
@@ -12,7 +12,6 @@ Register::Register()    // Inizializzazione costruttore responsabile per lo star
     SP.reset();
 
     IR.reset();
-
     FLAGS.reset();
 
 }
